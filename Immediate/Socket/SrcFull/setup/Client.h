@@ -7,6 +7,8 @@ class Client{
     void startingClient();
 
   private:
+    void recvMsg();
+    void sendMsgByUser();
     void printError(std::string msg);
     //setup client
     void setupOneClient();

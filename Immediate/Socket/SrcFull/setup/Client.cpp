@@ -25,17 +25,29 @@ void Client::setupOneClient(){
   }
 }
 
+void Client::recvMsg(){
+  buffer.resize(BUFSIZE);
+  bzero(&buffer[0], BUFSIZE-1);
+  n = recv(uSock, &buffer[0], BUFSIZE-1,0);
+  if(n <0){
+    this->printError("Error on reading");
+  }
+}
+
+void Client::sendMsgByUser(){
+  bzero(&buffer[0], BUFSIZE-1);
+  fgets(&buffer[0], BUFSIZE-1, stdin);
+  n = send(uSock,  &buffer[0], BUFSIZE-1,0);
+  if(n<0){
+    this->printError("Error on writing");
+  }
+}
+
 void Client::startingClient(){
   this->setupOneClient();
   while(1){
     recvBuffer:
-    buffer.resize(BUFSIZE);
-    bzero(&buffer[0], BUFSIZE-1);
-    
-    n = recv(uSock, &buffer[0], BUFSIZE-1,0);
-    if(n <0){
-      this->printError("Error on reading");
-    }
+    this->recvMsg();
     std::cout << buffer << std::endl;
     if(buffer[0] =='\\'){
       std::istringstream iss(buffer);
@@ -47,33 +59,26 @@ void Client::startingClient(){
         break;
       }
       if(token1 == "\\GETFILEPROCESSING"){
-        std::string strOut = token2;
+        //get file info
+        long fileSize = stol(token3);
+        std::string fileName;
+        std::istringstream iss(token2);
+        iss>>fileName;
+        //send accept command
+        std::string strOut = "OK";
         send(uSock, strOut.c_str(), strOut.size() + 1, 0);
-        buffer.resize(BUFSIZE);
-        bzero(&buffer[0], BUFSIZE-1);
-        n = recv(uSock, &buffer[0], BUFSIZE-1,0);
-        if(n <0){
-          this->printError("Error on reading");
-        }
-        n = myFile.recvFileClient(buffer, token2);
+        //recv data 
+        myFile.recvFile("clientrecv/"+fileName, fileSize, uSock);
       }
       if(token1 == "\\PUTFILEPROCESSING"){
-        bzero(&buffer[0], BUFSIZE-1);
-        buffer = myFile.sendFile(token2);
-        n = send(uSock,  &buffer[0], BUFSIZE-1,0);
-        if(n<0){
-          this->printError("Error on writing");
-        }
+        std::istringstream iss(token2);
+        std::string fileName;
+        iss>>fileName;
+        myFile.sendFile(uSock,"clientsend/"+fileName, stol(token3));
         goto recvBuffer;
       }
     }
-    bzero(&buffer[0], BUFSIZE-1);
-    fgets(&buffer[0], BUFSIZE-1, stdin);
-    n = send(uSock,  &buffer[0], BUFSIZE-1,0);
-    if(n<0){
-      this->printError("Error on writing");
-    }
-  
+    this->sendMsgByUser();
   }
   std::cout << "Client: "<< uPortNum << " Quited" << std::endl;
   close(uSock);

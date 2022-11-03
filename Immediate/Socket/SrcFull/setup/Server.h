@@ -9,6 +9,7 @@ class Server{
 
 
   private:
+    void* handle_connection(int clientSocket);
     //print error
     void printError(std::string msg);
     //setup one Server
@@ -25,6 +26,12 @@ class Server{
     void command(std::string command, int clientSocket);
     //send file Command
     void fileCommand(std::string command, int clientSocket);
+
+
+    void recvMsg(int &clientSocket, fd_set &currentSockets);
+   
+    std::string buffer;
+    size_t bytesRead;
     bool RUNNING_FLAG = 1;
     Map Object;
     handleFile myFile;

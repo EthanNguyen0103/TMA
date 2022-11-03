@@ -14,11 +14,12 @@
 #include <fstream>
 #include <algorithm>
 #include <filesystem>
+#include <fcntl.h>
+#include <sys/stat.h>
 
-#define BUFSIZE 1024
+#define BUFSIZE 4096
 #define PATH_MAX 1024
-#define SERVER_PORT 8109
+#define SERVER_PORT 7068
 #define SERVER_BACKLOG 4
-
 
 

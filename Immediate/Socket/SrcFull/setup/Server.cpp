@@ -1,4 +1,6 @@
 #include "Server.h"
+#include <fcntl.h>
+#include <fstream>
 
 void Server::startingServer(){
   int serverSocket = this->createSocket(SERVER_PORT, SERVER_BACKLOG);
@@ -28,17 +30,17 @@ void Server::startingServer(){
       }
     }
   }
-  //send msg to client server shutdown
-  std::string msg = "Server is shutting down. Goodbye";
-  for(int i =0; i <FD_SETSIZE;i++){
-    if(FD_ISSET(i, &readySockets)){
-      // Send the goodbye message
-      send(i, msg.c_str(), msg.size() + 1, 0);
-      // Remove it from the master file list and close the socket
-      FD_CLR(i, &currentSockets);
-      close(i);
-    }
-  }
+  // //send msg to client server shutdown
+  // std::string msg = "Server is shutting down. Goodbye";
+  // for(int i =0; i <FD_SETSIZE;i++){
+  //   if(FD_ISSET(i, &readySockets)){
+  //     // Send the goodbye message
+  //     send(i, msg.c_str(), msg.size() + 1, 0);
+  //     // Remove it from the master file list and close the socket
+  //     FD_CLR(i, &currentSockets);
+  //     close(i);
+  //   }
+  // }
   FD_CLR(serverSocket, &currentSockets);
   close(serverSocket);
 }
@@ -109,17 +111,19 @@ void Server::command(std::string command, int clientSocket){
   send(clientSocket, strOut.c_str(), strOut.size() + 1, 0);
 }
 
-
-
-int Server::sendMsg(int &clientSocket, fd_set &currentSockets){
-  std::string buffer;
-  size_t bytesRead;
+void Server::recvMsg(int &clientSocket, fd_set &currentSockets){
   buffer.resize(BUFSIZE);
   bzero(&buffer[0], BUFSIZE);
   if((bytesRead = recv(clientSocket, &buffer[0], BUFSIZE,0))<0){
     FD_CLR(clientSocket,&currentSockets);
     this->printError("Error on reading");
   }
+}
+
+
+
+int Server::sendMsg(int &clientSocket, fd_set &currentSockets){
+  this->recvMsg(clientSocket, currentSockets);
   std::cout << "Client "<<clientSocket << " reply: " << buffer << std::endl;
 
   // detect \\ command
@@ -138,10 +142,8 @@ int Server::sendMsg(int &clientSocket, fd_set &currentSockets){
       return 0;
     }
     if(token1 == "\\QUITSERVER"){
-      RUNNING_FLAG = 0;
-      Object.delALLMap(clientSocket);
       this->outComand(clientSocket);
-      FD_CLR(clientSocket, &currentSockets);
+      RUNNING_FLAG = 0;
       return 0;
     }
     if(token1 == "\\GET"){
@@ -178,59 +180,57 @@ int Server::sendMsg(int &clientSocket, fd_set &currentSockets){
       }
     }
     if(token1 == "\\GETFILE"){
-      std::string strOut = myFile.sendFile("recv/"+token2);  
-      if(strOut == "Error: file not found"){
-        this->command("Error: file not found",clientSocket);
+      //send command if file not found
+      std::string checkFile;
+      checkFile = myFile.handleFileName(token2);
+      if(checkFile == "Error"){
+        this->command("File doesn't exis", clientSocket);
+        return 0;
       }
-      else{
-        this->fileCommand("\\GETFILEPROCESSING "+token2, clientSocket);
-        buffer.resize(BUFSIZE);
-        bzero(&buffer[0], BUFSIZE);
-        if((bytesRead = recv(clientSocket, &buffer[0], BUFSIZE,0))<0){
-          FD_CLR(clientSocket,&currentSockets);
-          this->printError("Error on reading");
-        }
-        send(clientSocket, strOut.c_str(), strOut.size() + 1, 0);
-      }
+      //send command
+      long fileSize = myFile.getFileSize(checkFile);
+      this->fileCommand("\\GETFILEPROCESSING "+ token2 +" "+ std::to_string(fileSize), clientSocket);
+      //get accept command
+      this->recvMsg(clientSocket, currentSockets);
+      //send file
+      myFile.sendFile(clientSocket, checkFile, fileSize);
       return 0;
     }
     if(token1 == "\\PUTFILE"){
-      int n;
-      this->fileCommand("\\PUTFILEPROCESSING "+token2, clientSocket);
-      buffer.resize(BUFSIZE);
-      bzero(&buffer[0], BUFSIZE);
-      if((bytesRead = recv(clientSocket, &buffer[0], BUFSIZE,0))<0){
-        FD_CLR(clientSocket,&currentSockets);
-        this->printError("Error on reading");
-      }
-      std::cout << "Client "<<clientSocket << " reply: " << buffer << std::endl;
-      n = myFile.recvFile(buffer, token2, clientSocket);
-      if(n==-1){
+      //send command if exis file
+      std::string checkFile;
+      checkFile = myFile.handleFileName(token2, clientSocket);
+      if(checkFile == "Error"){
         this->command("File exis", clientSocket);
+        return 0;
       }
-      else{
-        this->command("Put file oke",clientSocket);
-      }
+      //send command
+      long fileSize = myFile.getFileSize("clientsend/"+checkFile);
+      this->fileCommand("\\PUTFILEPROCESSING "+token2+" "+std::to_string(fileSize), clientSocket);
+      //get file da
+      myFile.recvFile("recv/"+checkFile, fileSize, clientSocket);
+      this->command("PUT OK", clientSocket);
       return 0;
     }
     if(token1 == "\\DELFILE"){
       int n;
       n = myFile.deleteFile(token2, clientSocket);
       if(n == 1){
-      this->command("file "+token2+ " deleted", clientSocket);
+        this->command("file "+token2+ " deleted", clientSocket);
       }
       if(n == 0){
-      this->command("file "+token2+ " notfound", clientSocket);
+        this->command("file "+token2+ " notfound", clientSocket);
       }
       if(n == -1){
-      this->command("filesystem error", clientSocket);
+        this->command("filesystem error", clientSocket);
       }
       if(n == -2){
-      this->command("You do not have permission to del or file not found", clientSocket);
-     }
-     return 0;
+        this->command("You do not have permission to del or file not found", clientSocket);
+      }
+      return 0;
     }
   }
   this->command("UNKNOWN", clientSocket);
   return 0;
 }
+
