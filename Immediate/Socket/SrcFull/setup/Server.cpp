@@ -30,17 +30,17 @@ void Server::startingServer(){
       }
     }
   }
-  // //send msg to client server shutdown
-  // std::string msg = "Server is shutting down. Goodbye";
-  // for(int i =0; i <FD_SETSIZE;i++){
-  //   if(FD_ISSET(i, &readySockets)){
-  //     // Send the goodbye message
-  //     send(i, msg.c_str(), msg.size() + 1, 0);
-  //     // Remove it from the master file list and close the socket
-  //     FD_CLR(i, &currentSockets);
-  //     close(i);
-  //   }
-  // }
+  //send msg to client server shutdown
+  std::string msg = "Server is shutting down. Goodbye";
+  for(int i =0; i <FD_SETSIZE;i++){
+    if(FD_ISSET(i, &readySockets)){
+      // Send the goodbye message
+      send(i, msg.c_str(), msg.size() + 1, 0);
+      // Remove it from the master file list and close the socket
+      FD_CLR(i, &currentSockets);
+      close(i);
+    }
+  }
   FD_CLR(serverSocket, &currentSockets);
   close(serverSocket);
 }

@@ -38,7 +38,8 @@ std::string handleFile::handleFileName(std::string token2){
 }
 
 void handleFile::sendFile(int clientSocket, std::string filePath , long realSize){
-  char buffer[BUFSIZE]; 
+  std::string buffer; 
+  buffer.resize(BUFSIZE);
   ssize_t readFileReturn;
   int filefd = open(&filePath[0], O_RDONLY);
   if (filefd == -1) {
@@ -48,13 +49,13 @@ void handleFile::sendFile(int clientSocket, std::string filePath , long realSize
   long fileSize {0};
   std::cout << "Filesize: " << realSize <<std::endl;
   while (1) {
-    readFileReturn = read(filefd, buffer, BUFSIZE );
+    readFileReturn = read(filefd, &buffer[0], BUFSIZE);
     if (readFileReturn == 0)
       break;
     if (readFileReturn == -1) {
       this->printError("Read error");
     }
-    if (send(clientSocket, buffer, readFileReturn, 0) == -1) {
+    if (send(clientSocket, &buffer[0], readFileReturn, 0) == -1) {
       this->printError("Write error");
     }
     fileSize += readFileReturn;
